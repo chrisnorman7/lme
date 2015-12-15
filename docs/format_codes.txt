@@ -1,0 +1,6 @@
+{player_name} - The name of the current player or noone.
+{player_title} - The title of the current player or Noone.
+{name} - The name of the object.
+{title} - The title of the object.
+{location_name} - The name of the current location or nowhere.
+{location_title} - The title of the current location or Nowhere.

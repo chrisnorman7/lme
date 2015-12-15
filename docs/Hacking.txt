@@ -1,0 +1,11 @@
+# Testing the code.
+
+To test the code, cd into the top-level directory and run pytest.
+
+Logging output is generated as the tests run. If you want to see this in real time, use the -s switch. I personally like to include the -q switch so I don't see the platform that I'm running on ETC. So my full command is:
+py.test -sq
+
+If you're paranoid, you can include the tests directory like so:
+py.test -sq tests
+
+But Pytest seems to find it quite happily on it's own.

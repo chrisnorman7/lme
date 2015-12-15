@@ -1,0 +1,28 @@
+Mobile (and player) statistics:
+
+HP - Hitpoints
+This is health. If it falls to 0 the object dies.
+
+CON - Constitution
+This is how fast the object will heal or recover from illness.
+
+STR - Strength
+This determines how fast the object hits.
+
+DEX - Dexterity
+This determines how much damage this object can avoid.
+
+MAG - Magic
+Like strength but for spells.
+
+BRA - Brain
+Like dex but for magic users.
+
+AUR - Aura
+The energy required to cast spells.
+
+END - Endurance
+How long an object can keep performing physical activities.
+
+RES - Resolve
+How quickly the object can restore their aura.
