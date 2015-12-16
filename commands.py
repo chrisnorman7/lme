@@ -108,7 +108,7 @@ def do_commands(obj, *args, **kwargs):
 do_commands.name = 'commands @commands'
 add_command('^[@]?commands$', do_commands)
 
-def do_say(obj, command, text):
+def do_say(obj, text):
  """
  Speak some text.
  
@@ -130,7 +130,7 @@ def do_say(obj, command, text):
   obj.notify('You cannot speak here.')
  return True
 do_say.name = 'say " \''
-add_command('''^(say|"|')[ ]?([^$]*)$''', do_say)
+add_command('''^(?:say |"|')([^$]*)$''', do_say)
 
 def do_break(obj):
  """
@@ -194,3 +194,67 @@ def do_redo(obj, text):
  return True
 do_redo.name = '.'
 add_command(r'^\.([^$]*)$', do_redo)
+
+def do_shout(obj, text):
+ """
+ Shout text to everyone in the game.
+ 
+ Synopsis:
+  shout <text>
+  !<text>
+ 
+ <text> will be announced to everyone currently connected.
+ """
+ if text:
+  db.notify_players('%s shouts, "%s"' % (obj.title(), text))
+ else:
+  obj.notify('Shout what?')
+ return True
+do_shout.name = 'shout !'
+add_command('^(?:!|shout )([^$]*)$', do_shout)
+
+def do_shutdown(obj, when, reason):
+ """
+ Shutdown the server after a certain period of time.
+ 
+ Synopsis:
+  shutdown <time>
+  @shutdown <time>
+ 
+ The server will need to be restarted from the console.
+ """
+ logger.info('Shutdown initialised by %s.', obj.title())
+ def f2():
+  """Actually perform the shutdown."""
+  db.notify_players('The server will be shutting down in 5 seconds.')
+  do_shutdown.delay = reactor.callLater(5, reactor.stop)
+ def f1(when, reason):
+  db.notify_players('The server will be shutting down for %s in %s second%s.' % (reason, when, '' if when== 1 else 's'))
+  if when > 5:
+   do_shutdown.delay = reactor.callLater(when - 5, f2)
+  else:
+   do_shutdown.delay = reactor.callLater(when, reactor.stop)
+ obj.read(lambda text, player = obj, w = when, r = reason: f1(int(w), r.strip() or 'maintenance') if util.yes_or_no(text) else player.notify('Shutdown aborted.'), 'Are you sure you want to shutdown the server in %s second%s?' % (when, '' if when == '1' else 's'))
+ return True
+do_shutdown.name = 'shutdown @shutdown'
+do_shutdown.access = players.WIZARD
+add_command('^@?shutdown (\d+)([^$]*)$', do_shutdown)
+
+def do_abort_shutdown(obj):
+ """
+ Abort a running shutdown.
+ 
+ Synopsis:
+  abort-shutdown
+  @abort-shutdown
+ """
+ if hasattr(do_shutdown, 'delay'):
+  do_shutdown.delay.cancel()
+  db.notify_players('Shutdown aborted.')
+  del do_shutdown.delay
+ else:
+  obj.notify('There is no shutdown in progress.')
+ return True
+do_abort_shutdown.name = 'abort-shutdown @abort-shutdown'
+do_abort_shutdown.access = players.WIZARD
+add_command('^@?abort-shutdown$', do_abort_shutdown)

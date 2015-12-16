@@ -1,4 +1,4 @@
-name = 'LittleMUD Server'
+name = 'Little MUD Engine'
 version = '0.1'
 
 import logging, errors, genders, options, util, objects, db, commands
@@ -142,8 +142,11 @@ class ServerProtocol(LineReceiver):
     self.transport.read_func(line)
    except Exception as e:
     self.transport.write('An error was raised while passing the line to the target function. See log for details.\r\n'.encode(options.args.default_encoding))
-    logging.critical('While trying to read a line from host %s the following error was raised:', self.transport.host)
+    logging.critical('While trying to read a line from host %s the following error was raised:', self.transport.hostname)
     logger.exception(e)
+   finally:
+    self.state = READY
+    self.transport.read_func = None
   else:
    logger.warning('Unknown connection state: %s.', self.state)
    self.sendLine('Sorry, but an unknown error occurred. Please log in again.')
@@ -232,7 +235,7 @@ def disconnect_all():
  if connections:
   logger.info('Closing connections...')
   for transport in connections:
-   transport.abortConnection()
+   transport.loseConnection()
  else:
   logger.info('No connections to close.')
 
@@ -241,10 +244,15 @@ def initialise():
  reactor.listenTCP(options.args.port, Factory())
  logger.info('Listening for connections on port %s.', options.args.port)
  reactor.addSystemEventTrigger('before', 'shutdown', disconnect_all)
+ reactor.addSystemEventTrigger('after', 'shutdown', shutdown)
 
 def server_name():
- return '%s (version %s)' % (name, version)
+ return '%s (version %s)' % (db.server_config['server_name'], version)
 
 def uptime():
  """Returns the number of seconds the server has been up for."""
  return time() - started
+
+def shutdown():
+ db.dump()
+ logging.info('Server shutting down.')

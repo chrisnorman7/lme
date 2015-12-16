@@ -99,3 +99,9 @@ def get_players():
  for o in objects:
   if isinstance(o, _objects.PlayerObject):
    yield o
+
+def notify_players(text, access = 0):
+ """Send text to all players who have an access level >= access."""
+ for p in get_players():
+  if p.access >= access:
+   p.notify(text)

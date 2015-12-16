@@ -33,3 +33,6 @@ def english_list(value, sep = ', ', and_string = 'and'):
   return str(value[0])
  else:
   return '%s%s%s %s' % (sep.join([str(v) for v in value[:-1]]), sep, and_string, value[-1])
+
+def yes_or_no(text):
+ return text in ['y', 'yes']

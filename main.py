@@ -9,5 +9,3 @@ if __name__ == '__main__':
  db.load()
  server.initialise()
  reactor.run()
- db.dump()
- logging.info('Server shutting down.')
