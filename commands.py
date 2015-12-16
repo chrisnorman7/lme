@@ -132,18 +132,17 @@ def do_say(obj, command, text):
 do_say.name = 'say " \''
 add_command('''^(say|"|')[ ]?([^$]*)$''', do_say)
 
-def do_fuckup(obj):
+def do_break(obj):
  """
  Causes a traceback for debugging purposes.
  
  Synopsis:
-  fuck
-  fuckup
+  break
  """
- raise RuntimeError('Yes, that was a fuck up alright.')
-do_fuckup.name = 'fuck fuckup'
-do_fuckup.access = players.PROGRAMMER
-add_command('^fuck(?:up)?$', do_fuckup)
+ raise RuntimeError('Yes, that broke alright.')
+do_break.name = 'break'
+do_break.access = players.PROGRAMMER
+add_command('^break$', do_break)
 
 def do_eval(obj, text):
  """
