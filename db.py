@@ -6,7 +6,11 @@ players = [] # List of created players.
 server_config = dict( # Server configuration.
  connect_msg = '*** Connected ***',
  disconnect_msg = '*** Disconnected ***',
- redirect_msg = '*** Redirecting to {host}:{port}. ***'
+ redirect_msg = '*** Redirecting to {host}:{port}. ***',
+ max_create_retries = 5,
+ max_create_retries_exceeded = 'Maximum number of retries exceeded. Please come again.',
+ server_name = 'The LittleMUD Test Server',
+ command_history_length = 100, # The number of commands to store for a given player.
 )
 
 objects_config = {} # Configuration which requires objects.

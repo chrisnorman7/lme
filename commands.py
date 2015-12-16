@@ -22,6 +22,8 @@ access - The level of access necessary to view and execute this command.
 import server, re, objects, objects.players as players, logging, options, db, util, traceback
 from twisted.internet import reactor
 from inspect import getdoc
+from datetime import timedelta
+from time import ctime
 
 commands = {} # Command regexp and functions.
 
@@ -49,6 +51,9 @@ def do_command(obj, command):
  command = command.decode(options.args.default_encoding, errors = 'ignore')
  if options.args.log_commands:
   logger.info('%s entered command: %s', obj.title(), command)
+ obj.commands.append(command)
+ while len(obj.commands) > db.server_config['command_history_length']:
+  del obj.commands[0]
  for cmd, func in commands.items():
   if obj.access >= func.access:
    m = cmd.match(command)
@@ -65,7 +70,7 @@ def do_command(obj, command):
   cmd = command.split()[0]
   for f in commands.values():
    if obj.access >= f.access and cmd in f.name:
-    obj.notify('Command not understood. Did you mean %s?' % f.name.split()[0])
+    obj.notify('Command %s not understood. Did you mean %s?' % (cmd, f.name.split()[0]))
     break
   else:
    obj.notify('Command %s not found. If you are having trouble finding commands and their syntax, try typing commands.' % cmd)
@@ -158,3 +163,35 @@ def do_eval(obj, text):
 do_eval.name = 'eval ;'
 do_eval.access = players.PROGRAMMER
 add_command(r'^(?:eval|\;)([^$]*)$', do_eval)
+
+def do_uptime(obj):
+ """
+ Shows how long the server has been running for.
+ 
+ Synopsis:
+  uptime
+  @uptime
+ """
+ return obj.notify('The server has been up since %s (%s).' % (ctime(server.started), timedelta(seconds = server.uptime())))
+do_uptime.name = 'uptime @uptime'
+add_command('^@?uptime$', do_uptime)
+
+def do_redo(obj, text):
+ """
+ Re-enter the last command.
+ 
+ Synopsis:
+  .
+  .<text to append>
+ 
+ Any text which appears after the . will be appended to the previous command and the command will be treated as a whole.
+ """
+ if len(obj.commands) > 1:
+  cmd = obj.commands[-2]
+  cmd += text
+  do_command(obj, cmd)
+ else:
+  obj.notify('You have no commands to repeat.')
+ return True
+do_redo.name = '.'
+add_command(r'^\.([^$]*)$', do_redo)

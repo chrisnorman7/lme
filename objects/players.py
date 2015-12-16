@@ -8,9 +8,9 @@ logger = logging.getLogger('Player Objects')
 
 # Access permissions
 NORMAL = 0 # Standard player.
-BUILDER = 1 # Player can build.
-PROGRAMMER = 2 # Player can program and eval code.
-WIZARD = 3 # Player can do anything.
+BUILDER = 10 # Player can build.
+PROGRAMMER = 20 # Player can program and eval code.
+WIZARD = 30 # Player can do anything.
 
 class PlayerObject(MobObject):
  @property
@@ -31,9 +31,11 @@ class PlayerObject(MobObject):
    '_pwd',
    'last_connected_time',
    'last_connected_host',
-   'access'
+   'access',
+   'commands'
   ]
   self.access = NORMAL
+  self.commands = [] # Command history.
   self.last_connected_time = None
   self.last_connected_host = None
   self.banned = False # If True disallow the player from logging in.
@@ -70,10 +72,12 @@ class PlayerObject(MobObject):
    self.notify(thing.title())
    self.notify(thing.description)
  
- def notify(self, text):
+ def notify(self, text, disconnect = False):
   if self.transport:
-   s = '%s\r\n' % text
-   reactor.callFromThread(self.transport.write, util.format_colour(s).encode('utf-8') )
+   self.transport.protocol.sendLine(
+    util.format_colour('%s' % text),
+    disconnect = disconnect
+   )
    return True
   else:
    return False
