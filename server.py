@@ -56,7 +56,7 @@ class ServerProtocol(LineReceiver):
    for p in db.players:
     if p.authenticate(self.uid, line):
      logger.info('%s authenticated as %s.', self.transport.hostname, p.title())
-     self.sendLine('Welcome back, {name}.{delimiter}{delimiter}You last logged in on {connect_time} from {connect_host}.'.format(name = p.title(), delimiter = self.delimiter, connect_time = ctime(p.last_connected_time), connect_host = p.last_connected_host))
+     self.sendLine('Welcome back, {name}.{delimiter}{delimiter}You last logged in on {connect_time} from {connect_host}.'.format(name = p.title(), delimiter = self.delimiter.decode(options.args.default_encoding) if hasattr(self.delimiter, 'decode') else self.delimiter, connect_time = ctime(p.last_connected_time), connect_host = p.last_connected_host))
      self.post_login(p)
      break
    else:
@@ -139,7 +139,7 @@ class ServerProtocol(LineReceiver):
    self.post_login(p)
   elif self.state == READING:
    try:
-    self.transport.read_func(line)
+    self.transport.read_func(line.decode(options.args.default_encoding) if hasattr(line, 'decode') else line)
    except Exception as e:
     self.transport.write('An error was raised while passing the line to the target function. See log for details.\r\n'.encode(options.args.default_encoding))
     logging.critical('While trying to read a line from host %s the following error was raised:', self.transport.hostname)

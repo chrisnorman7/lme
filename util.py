@@ -1,4 +1,8 @@
-import string, structs
+"""Utility functions."""
+
+import string, structs, db, re
+
+numerical_match = re.compile(r'^(\d+.|)([^$]+)$')
 
 def disallowed_name(name):
  """Checks a name conforms to the supported format."""
@@ -36,3 +40,26 @@ def english_list(value, sep = ', ', and_string = 'and'):
 
 def yes_or_no(text):
  return text in ['y', 'yes']
+
+def match(text, objects, prop = 'name', method = 'startswith'):
+ """
+ Match text against a list of objects.
+ 
+ Checks the prop property of each object to see if it's .method method returns something which evaluates to True.
+ """
+ text = text.lower()
+ m = numerical_match.match(text)
+ if m:
+  index, search = m.groups()
+  results = [o for o in objects if getattr(getattr(o, prop).lower(), method)(search)]
+  if index:
+   try:
+    return [results[int(index[:-1])]]
+   except IndexError:
+    return []
+  else:
+   return results
+
+def match_player(text, players = None):
+ """Match a list of players. players defaults to db.get_players()."""
+ return match(text, players if players else db.get_players(), method = '__contains__')

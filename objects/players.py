@@ -88,3 +88,12 @@ class PlayerObject(MobObject):
    self.notify(text)
   self.transport.read_func = func
   self.transport.protocol.state = server.READING
+ 
+ def match(self, text):
+  """Personal match."""
+  if text in ['i', 'me']:
+   return self
+  elif text == 'here':
+   return self.location
+  else:
+   return util.match(text, set(self.contents + self.location.contents + [self.location, self]))

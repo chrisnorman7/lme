@@ -13,6 +13,6 @@ parser.add_argument('-p', '--port', type = int, default = 4444, help = 'The serv
 parser.add_argument('-d', '--dumpfile', dest = 'dump_file', default = 'DB.json', help = 'Where to dump the database')
 parser.add_argument('-c', '--log-commands', action = 'store_true', help = 'Log commands')
 
-args = parser.parse_args([])
+args = parser.parse_args([] if 'py.test' in sys.argv[0] else sys.argv[1:])
 
 logging.basicConfig(stream = args.logfile, level = args.loglevel.upper(), format = args.logformat)

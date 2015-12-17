@@ -48,7 +48,11 @@ def add_command(expr, func):
  commands[re.compile(expr)] = func
 
 def do_command(obj, command):
- command = command.decode(options.args.default_encoding, errors = 'ignore')
+ """Perform command for obj."""
+ if not command:
+  command = '\n'
+ if hasattr(command, 'decode'):
+  command = command.decode(options.args.default_encoding, errors = 'ignore')
  if options.args.log_commands:
   logger.info('%s entered command: %s', obj.title(), command)
  obj.commands.append(command)
@@ -67,7 +71,10 @@ def do_command(obj, command):
      logger.critical('While executing command %s for player %s (%s), the following exception was raised:', cmd, obj.title(), obj.transport.hostname)
      logger.exception(e)
  else:
-  cmd = command.split()[0]
+  try:
+   cmd = command.split()[0] + ' '
+  except IndexError:
+   cmd = '' # It's just a blank line... probably.
   for f in commands.values():
    if obj.access >= f.access and cmd in f.name:
     obj.notify('Command %s not understood. Did you mean %s?' % (cmd, f.name.split()[0]))
@@ -154,7 +161,7 @@ def do_eval(obj, text):
  """
  logging.warning('%s (%s) evaluating code: %s', obj.title(), obj.transport.hostname, text)
  try:
-  obj.notify(eval(text))
+  obj.notify(repr(eval(text)))
  except Exception as e:
   obj.notify(traceback.format_exc().replace('\n', '\r\n'))
  finally:
