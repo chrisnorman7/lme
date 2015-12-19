@@ -1,5 +1,6 @@
 name = 'Little MUD Engine'
 version = '0.1'
+port = None # Should be set when initialise() is called.
 
 import logging, errors, genders, options, util, objects, db, commands
 from time import time, ctime
@@ -15,6 +16,7 @@ connections = {} # All active connections.
 from twisted.protocols.basic import LineReceiver
 from twisted.internet.protocol import ServerFactory
 from twisted.internet import reactor
+from twisted.internet.error import AlreadyCalled
 
 # Possible connection states:
 READY = 0 # The server will process commands normally.
@@ -29,131 +31,153 @@ FROZEN = 8 # Input from this connection will be ignored until the state is chang
 READING = 9 # Waiting for the connected player to type something which will be passed to self.transport.read_func.
 
 class ServerProtocol(LineReceiver):
+ def do_timeout(self):
+  """Actually disconnect the transport."""
+  if not connections[self.transport]:
+   self.sendLine(get_config('timeout_msg'), True)
+   self.logger.info('Timed out.')
+ 
+ def cancel_timeout(self):
+  """Cancel the timeout for transport."""
+  try:
+   self.timeout.cancel()
+  except AlreadyCalled:
+   pass # It's already dead.
+  self.timeout = None
+ 
+ def reset_timeout(self):
+  if self.timeout:
+   self.cancel_timeout()
+  self.timeout = reactor.callLater(get_config('login_timeout'), self.do_timeout)
+ 
  def __init__(self, *args, **kwargs):
   self.state = USERNAME
   self.uid = None # The username which has been provided.
   self.pwd = None
   self.name = None
+  self.timeout = None
+  self.logger = logging.getLogger('<Connection unspecified>')
  
  def handle_line(self, line):
   """The threaded version of lineReceived."""
   if self.state == FROZEN:
    self.sendLine('You are totally frozen.')
-   logger.info('%s attempted command while frozen: %s', line)
+   self.logger.info('attempted command while frozen: %s', line)
   elif self.state == READY:
    commands.do_command(connections[self.transport], line)
-  elif self.state == USERNAME:
-   if line:
-    if line == 'new':
-     self.create_username()
-    else:
-     self.uid = line
-     self.state = PASSWORD
-     self.sendLine('Password: ')
-   else:
-    self.sendLine('You must provide a username.', True)
-  elif self.state == PASSWORD:
-   for p in db.players:
-    if p.authenticate(self.uid, line):
-     logger.info('%s authenticated as %s.', self.transport.hostname, p.title())
-     self.sendLine('Welcome back, {name}.{delimiter}{delimiter}You last logged in on {connect_time} from {connect_host}.'.format(name = p.title(), delimiter = self.delimiter.decode(options.args.default_encoding) if hasattr(self.delimiter, 'decode') else self.delimiter, connect_time = ctime(p.last_connected_time), connect_host = p.last_connected_host))
-     self.post_login(p)
-     break
-   else:
-    logger.info('%s failed to authenticate with username: %s.', self.transport.hostname, self.uid)
-    self.sendLine('Invalid username and password combination.', True)
-  elif self.state == CREATE_USERNAME:
-   self.tries += 1
-   if self.tries >= get_config('max_create_retries'):
-    return self.sendLine(get_config('max_create_retries_exceeded'), True)
-   if line:
-    for p in db.players:
-     if p.uid == line:
-      self.sendLine('That username is already taken.')
+  else:
+   self.reset_timeout()
+   if self.state == USERNAME:
+    if line:
+     if line == 'new':
       self.create_username()
+     else:
+      self.uid = line
+      self.state = PASSWORD
+      self.sendLine('Password: ')
+    else:
+     self.sendLine('You must provide a username.', True)
+   elif self.state == PASSWORD:
+    for p in db.players:
+     if p.authenticate(self.uid, line):
+      logger.info('Authenticated as %s.', p.title())
+      self.sendLine('Welcome back, {name}.{delimiter}{delimiter}You last logged in on {connect_time} from {connect_host}.'.format(name = p.title(), delimiter = self.delimiter.decode(options.args.default_encoding) if hasattr(self.delimiter, 'decode') else self.delimiter, connect_time = ctime(p.last_connected_time), connect_host = p.last_connected_host))
+      self.post_login(p)
       break
     else:
-     self.uid = line
-     self.tries = 0
-     self.create_password()
-   else:
-    self.sendLine('Usernames must not be blank.', True)
-  elif self.state == CREATE_PASSWORD_1:
-   self.tries += 1
-   if self.tries >= get_config('max_create_retries'):
-    return self.sendLine(get_config('max_create_retries_exceeded'), True)
-   if not line:
-    self.sendLine('Passwords must not be blank.')
-    self.create_password()
-   else:
-    self.sendLine('Retype password: ')
-    self.tries = 0
-    self.pwd = line
-    self.state = CREATE_PASSWORD_2
-  elif self.state == CREATE_PASSWORD_2:
-   if line == self.pwd:
-    self.tries = 0
-    self.create_name()
-   else:
-    self.sendLine('Passwords do not match.')
-    self.create_password()
-  elif self.state == CREATE_NAME:
-   self.tries += 1
-   if self.tries >= get_config('max_create_retries'):
-    return self.sendLine(get_config('max_create_retries_exceeded'), True)
-   if line:
-    line = line.title()
-    for p in db.players:
-     if p.name == line:
-      self.sendLine('Sorry, but that name is already taken.')
-      self.create_name()
-    else:
-     msg = util.disallowed_name(line)
-     if msg:
-      self.sendLine(msg)
-      self.create_name()
+     self.logger.info('Failed to authenticate with username: %s.', self.uid)
+     self.sendLine('Invalid username and password combination.', True)
+   elif self.state == CREATE_USERNAME:
+    self.tries += 1
+    if self.tries >= get_config('max_create_retries'):
+     return self.sendLine(get_config('max_create_retries_exceeded'), True)
+    if line:
+     for p in db.players:
+      if p.uid == line:
+       self.sendLine('That username is already taken.')
+       self.create_username()
+       break
      else:
-      self.name = line
+      self.uid = line
       self.tries = 0
-      self.create_gender()
+      self.create_password()
+    else:
+     self.sendLine('Usernames must not be blank.', True)
+   elif self.state == CREATE_PASSWORD_1:
+    self.tries += 1
+    if self.tries >= get_config('max_create_retries'):
+     return self.sendLine(get_config('max_create_retries_exceeded'), True)
+    if not line:
+     self.sendLine('Passwords must not be blank.')
+     self.create_password()
+    else:
+     self.sendLine('Retype password: ')
+     self.tries = 0
+     self.pwd = line
+     self.state = CREATE_PASSWORD_2
+   elif self.state == CREATE_PASSWORD_2:
+    if line == self.pwd:
+     self.tries = 0
+     self.create_name()
+    else:
+     self.sendLine('Passwords do not match.')
+     self.create_password()
+   elif self.state == CREATE_NAME:
+    self.tries += 1
+    if self.tries >= get_config('max_create_retries'):
+     return self.sendLine(get_config('max_create_retries_exceeded'), True)
+    if line:
+     line = line.title()
+     for p in db.players:
+      if p.name == line:
+       self.sendLine('Sorry, but that name is already taken.')
+       self.create_name()
+     else:
+      msg = util.disallowed_name(line)
+      if msg:
+       self.sendLine(msg)
+       self.create_name()
+      else:
+       self.name = line
+       self.tries = 0
+       self.create_gender()
+    else:
+     self.sendLine('You must choose a name.')
+     self.create_name()
+   elif self.state == CREATE_SEX:
+    if line == '1':
+     gender = genders.MALE
+    elif line == '2':
+     gender = genders.FEMALE
+    else:
+     self.sendLine('Invalid input: %s. Try again.' % line)
+     return self.create_gender()
+    self.sendLine('You are now a %s.' % gender.sex)
+    p = objects.PlayerObject(self.name)
+    p.gender = gender
+    p.uid = self.uid
+    p.pwd = self.pwd
+    if len(list(db.get_players())) == 1: # This is the only player.
+     p.access = objects.players.WIZARD
+    self.logger.info('Created %s player: %s.', 'wizard' if p.access else 'normal', p.title())
+    p.move(db.objects_config['start_room'])
+    self.post_login(p)
+   elif self.state == READING:
+    try:
+     self.transport.read_func(line.decode(options.args.default_encoding) if hasattr(line, 'decode') else line)
+    except Exception as e:
+     self.sendLine('An error was raised while passing the line to the target function. See log for details.')
+     self.logger.exception(e)
+    finally:
+     self.state = READY
+     self.transport.read_func = None
    else:
-    self.sendLine('You must choose a name.')
-    self.create_name()
-  elif self.state == CREATE_SEX:
-   if line == '1':
-    gender = genders.MALE
-   elif line == '2':
-    gender = genders.FEMALE
-   else:
-    self.sendLine('Invalid input: %s. Try again.' % line)
-    return self.create_gender()
-   self.sendLine('You are now a %s.' % gender.sex)
-   p = objects.PlayerObject(self.name)
-   p.gender = gender
-   p.uid = self.uid
-   p.pwd = self.pwd
-   if len(list(db.get_players())) == 1: # This is the only player.
-    p.access = objects.players.WIZARD
-   logger.info('%s created %s player: %s.', self.transport.hostname, 'wizard' if p.access else 'normal', p.title())
-   p.move(db.objects_config['start_room'])
-   self.post_login(p)
-  elif self.state == READING:
-   try:
-    self.transport.read_func(line.decode(options.args.default_encoding) if hasattr(line, 'decode') else line)
-   except Exception as e:
-    self.transport.write('An error was raised while passing the line to the target function. See log for details.\r\n'.encode(options.args.default_encoding))
-    logging.critical('While trying to read a line from host %s the following error was raised:', self.transport.hostname)
-    logger.exception(e)
-   finally:
-    self.state = READY
-    self.transport.read_func = None
-  else:
-   logger.warning('Unknown connection state: %s.', self.state)
-   self.sendLine('Sorry, but an unknown error occurred. Please log in again.')
-   if connections[self.transport]:
-    connections[self.transport].transport = None
-   connections[self.transport] = None
-   self.get_username()
+    self.logger.warning('Unknown connection state: %s.', self.state)
+    self.sendLine('Sorry, but an unknown error occurred. Please log in again.')
+    if connections[self.transport]:
+     connections[self.transport].transport = None
+    connections[self.transport] = None
+    self.get_username()
  
  def lineReceived(self, line):
   Thread(target = self.handle_line, args = [line.strip()]).start()
@@ -182,7 +206,7 @@ class ServerProtocol(LineReceiver):
   self.state = READY
   if object.transport:
    host, port = self.transport.getHost().host, self.transport.getHost().port
-   logger.warning('Disconnecting %s:%s in favour of %s:%s.', object.transport.getHost().host, object.transport.getHost().port, host, port)
+   self.logger.warning('Disconnecting in favour of %s:%s.', host, port)
    object.notify(get_config('redirect_msg').format(host = host, port = port), True)
    while object.transport:
     pass
@@ -201,21 +225,27 @@ class ServerProtocol(LineReceiver):
   self.sendLine('Username (or new):')
  
  def connectionMade(self):
+  self.logger.name = '<Connection %s:%s>' % (self.transport.getHost().host, self.transport.getHost().port)
   self.tries = 0
   connections[self.transport] = None
   self.sendLine('Welcome to %s.' % get_config('server_name'))
-  if db.players:
+  if options.args.max_connections and len(connections) > options.args.max_connections:
+   self.sendLine('Sorry but the connection limit has been exceeded.', True)
+   return self.logger.warning('Booting because connection limit exceeded.')
+  elif db.players:
    self.get_username()
   else:
    self.sendLine('Creating initial user.')
    self.create_username()
+  self.reset_timeout()
  
  def connectionLost(self, reason):
   if connections[self.transport]:
    connections[self.transport].on_disconnected()
    connections[self.transport].transport = None
   del connections[self.transport]
-  logger.info('%s disconnected: %s.', self.transport.hostname, reason.getErrorMessage())
+  self.logger.info('Disconnected: %s.', reason.getErrorMessage())
+  self.cancel_timeout()
  
  def sendLine(self, line, disconnect = False):
   """Send a line to the client. If disconnect evaluates to True, also disconnect the client."""
@@ -241,10 +271,12 @@ def disconnect_all():
 
 def initialise():
  """Initialise the server."""
- reactor.listenTCP(options.args.port, Factory())
- logger.info('Listening for connections on port %s.', options.args.port)
+ logger.info('Max connections allowed: %s.', options.args.max_connections)
  reactor.addSystemEventTrigger('before', 'shutdown', disconnect_all)
  reactor.addSystemEventTrigger('after', 'shutdown', shutdown)
+ port = reactor.listenTCP(options.args.port, Factory())
+ logging.info('Now listening for connections on %s.', port.getHost())
+ return port
 
 def server_name():
  return '%s (version %s)' % (get_config('server_name'), version)
@@ -264,6 +296,7 @@ def get_config(key, default = KeyError):
   return db.server_config.get(key, default)
 
 def set_config(key, value):
+ logger.debug('Server_config[%s] = %s.', key, value)
  db.server_config[key] = value
 
 def clear_config(key):

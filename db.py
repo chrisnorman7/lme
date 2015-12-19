@@ -5,12 +5,15 @@ players = [] # List of created players.
 
 server_config = dict( # Server configuration.
  connect_msg = '*** Connected ***',
+ login_timeout = 60, # Number of seconds to wait before disconnecting unlogged in connections.
+ timeout_msg = '*** Timed out while waiting for login. ***',
  disconnect_msg = '*** Disconnected ***',
  redirect_msg = '*** Redirecting to {host}:{port}. ***',
  max_create_retries = 5,
  max_create_retries_exceeded = 'Maximum number of retries exceeded. Please come again.',
  server_name = 'The LittleMUD Test Server',
  command_history_length = 100, # The number of commands to store for a given player.
+ banned_hosts = [], # Hosts which aren't allowed to connect.
 )
 
 objects_config = {} # Configuration which requires objects.

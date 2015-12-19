@@ -72,10 +72,11 @@ class PlayerObject(MobObject):
    self.notify(thing.title())
    self.notify(thing.description)
  
- def notify(self, text, disconnect = False):
+ def notify(self, text, colours = True, disconnect = False):
+  text = '%s' % text
   if self.transport:
    self.transport.protocol.sendLine(
-    util.format_colour('%s' % text),
+    util.format_colour(text) if colours else text,
     disconnect = disconnect
    )
    return True

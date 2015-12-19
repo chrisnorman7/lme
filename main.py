@@ -8,5 +8,5 @@ if __name__ == '__main__':
   with open(options.args.dump_file, 'w') as f:
    f.write('{}')
  db.load()
- server.initialise()
+ server.port = server.initialise()
  reactor.run()

@@ -19,7 +19,7 @@ name - a space-separated list of commands which can be used to invoke this comma
 access - The level of access necessary to view and execute this command.
 """
 
-import server, re, objects, objects.players as players, logging, options, db, util, traceback
+import server, re, objects, objects.players as players, logging, options, db, util, traceback, socket
 from twisted.internet import reactor
 from inspect import getdoc
 from datetime import timedelta
@@ -80,7 +80,7 @@ def do_command(obj, command):
     obj.notify('Command %s not understood. Did you mean %s?' % (cmd, f.name.split()[0]))
     break
   else:
-   obj.notify('Command %s not found. If you are having trouble finding commands and their syntax, try typing commands.' % cmd)
+   obj.notify('Command %s not found. If you are having trouble finding commands and their syntax, try typing @commands.' % cmd)
 
 def do_quit(obj):
  """
@@ -94,7 +94,7 @@ def do_quit(obj):
  obj.transport.loseConnection()
  return True
 do_quit.name = 'quit @quit'
-add_command('^[@]?quit$', do_quit)
+add_command('^@?quit$', do_quit)
 
 def do_commands(obj, *args, **kwargs):
  """
@@ -112,8 +112,8 @@ def do_commands(obj, *args, **kwargs):
    obj.notify('%s: %s' % (util.english_list(f.name.split(), and_string = 'or').capitalize(), getdoc(f).strip().split('\n')[0]))
  obj.notify('Commands: %s.' % i)
  return True
-do_commands.name = 'commands @commands'
-add_command('^[@]?commands$', do_commands)
+do_commands.name = '@commands'
+add_command('^@commands$', do_commands)
 
 def do_say(obj, text):
  """
@@ -147,9 +147,9 @@ def do_break(obj):
   break
  """
  raise RuntimeError('Yes, that broke alright.')
-do_break.name = 'break'
+do_break.name = '@break'
 do_break.access = players.PROGRAMMER
-add_command('^break$', do_break)
+add_command('^@break$', do_break)
 
 def do_eval(obj, text):
  """
@@ -159,7 +159,7 @@ def do_eval(obj, text):
   eval <code>
   ;<code>
  """
- logging.warning('%s (%s) evaluating code: %s', obj.title(), obj.transport.hostname, text)
+ logger.warning('%s (%s) evaluating code: %s', obj.title(), obj.transport.hostname, text)
  try:
   obj.notify(repr(eval(text)))
  except Exception as e:
@@ -168,7 +168,7 @@ def do_eval(obj, text):
   return True
 do_eval.name = 'eval ;'
 do_eval.access = players.PROGRAMMER
-add_command(r'^(?:eval|\;)([^$]*)$', do_eval)
+add_command(r'^(?:eval|;)([^$]*)$', do_eval)
 
 def do_uptime(obj):
  """
@@ -179,8 +179,8 @@ def do_uptime(obj):
   @uptime
  """
  return obj.notify('The server has been up since %s (%s).' % (ctime(server.started), timedelta(seconds = server.uptime())))
-do_uptime.name = 'uptime @uptime'
-add_command('^@?uptime$', do_uptime)
+do_uptime.name = '@uptime'
+add_command('^@uptime$', do_uptime)
 
 def do_redo(obj, text):
  """
@@ -243,9 +243,9 @@ def do_shutdown(obj, when, reason):
    do_shutdown.delay = reactor.callLater(when, reactor.stop)
  obj.read(lambda text, player = obj, w = when, r = reason: f1(int(w), r.strip() or 'maintenance') if util.yes_or_no(text) else player.notify('Shutdown aborted.'), 'Are you sure you want to shutdown the server in %s second%s?' % (when, '' if when == '1' else 's'))
  return True
-do_shutdown.name = 'shutdown @shutdown'
+do_shutdown.name = '@shutdown'
 do_shutdown.access = players.WIZARD
-add_command('^@?shutdown (\d+)([^$]*)$', do_shutdown)
+add_command('^@shutdown (\d+)([^$]*)$', do_shutdown)
 
 def do_abort_shutdown(obj):
  """
@@ -262,6 +262,61 @@ def do_abort_shutdown(obj):
  else:
   obj.notify('There is no shutdown in progress.')
  return True
-do_abort_shutdown.name = 'abort-shutdown @abort-shutdown'
+do_abort_shutdown.name = '@abort-shutdown'
 do_abort_shutdown.access = players.WIZARD
-add_command('^@?abort-shutdown$', do_abort_shutdown)
+add_command('^@abort-shutdown$', do_abort_shutdown)
+
+def do_ban(obj, command, host):
+ """
+ Ban or unban an IP address.
+ 
+ Synopsis:
+  @ban <hostname or IP address>
+  @unban <hostname or IP address>
+ 
+ When banned, nobody logging in from the provided hostname will be able to connect to the server.
+ """
+ try:
+  ip = socket.gethostbyname(host)
+  hostname = '%s (%s)' % (host, ip)
+ except socket.error as e:
+  obj.notify('Could not find any address for host %s: %s.' % (host, e))
+ else:
+  if command == 'ban':
+   if ip in server.get_config('banned_hosts'):
+    obj.notify('Host %s is already a banned host.' % hostname)
+   else:
+    server.get_config('banned_hosts').append(ip)
+    obj.notify('Host %s added to banned hosts list.' % hostname)
+  else:
+   try:
+    server.get_config('banned_hosts').remove(ip)
+    obj.notify('Removed host %s from banned hosts list.' % hostname)
+   except KeyError:
+    obj.notify('Host %s is not a banned host.' % hostname)
+ finally:
+  return True
+do_ban.name = '@ban @unban'
+do_ban.access = players.WIZARD
+add_command(r'^@(ban|unban) ([^$]+)$', do_ban)
+
+def do_banned(obj):
+ """
+ List banned hosts.
+ 
+ Synopsis:
+  @banned
+ Hosts ban be banned or unbanned with the @ban and @unban commands.
+ """
+ banned = server.get_config('banned_hosts')
+ if banned:
+  obj.notify('Banned hosts: %s.' % len(banned))
+  for b in banned:
+   obj.notify('%s (%s)' % (b, socket.gethostbyaddr(b)[0]))
+  obj.notify('Done.')
+ else:
+  obj.notify('There are no banned hosts.')
+ return True
+do_banned.name = '@banned'
+do_banned.access = players.PROGRAMMER
+add_command('^@banned$', do_banned)
