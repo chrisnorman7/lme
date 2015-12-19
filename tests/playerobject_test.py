@@ -26,3 +26,10 @@ def test_dump():
 
 def test_load():
  p.load(p.dump()[1])
+
+def test_notify_with_colour():
+ p.notify('This text should be {bold_on}bold{bold_off}.')
+
+def test_notify_without_colour():
+ p.notify('This text should not be {bold_on}bold{bold_off}.')
+
