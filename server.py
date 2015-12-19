@@ -41,7 +41,7 @@ class ServerProtocol(LineReceiver):
   """Cancel the timeout for transport."""
   try:
    self.timeout.cancel()
-  except AlreadyCalled:
+  except (AttributeError, AlreadyCalled):
    pass # It's already dead.
   self.timeout = None
  
@@ -159,6 +159,8 @@ class ServerProtocol(LineReceiver):
     p.pwd = self.pwd
     if len(list(db.get_players())) == 1: # This is the only player.
      p.access = objects.players.WIZARD
+     for o in db.objects:
+      o.owner = p
     self.logger.info('Created %s player: %s.', 'wizard' if p.access else 'normal', p.title())
     p.move(db.objects_config['start_room'])
     self.post_login(p)
@@ -228,16 +230,27 @@ class ServerProtocol(LineReceiver):
   self.logger.name = '<Connection %s:%s>' % (self.transport.getHost().host, self.transport.getHost().port)
   self.tries = 0
   connections[self.transport] = None
-  self.sendLine('Welcome to %s.' % get_config('server_name'))
-  if options.args.max_connections and len(connections) > options.args.max_connections:
-   self.sendLine('Sorry but the connection limit has been exceeded.', True)
-   return self.logger.warning('Booting because connection limit exceeded.')
-  elif db.players:
-   self.get_username()
+  if options.args.auto_login:
+   for p in db.get_players():
+    if p.uid == options.args.auto_login:
+     self.logger.warning('Automatically authenticating as %s.', p.title())
+     self.sendLine('Automatically authenticating you as %s.' % p.title())
+     self.post_login(p)
+     break
+   else:
+    self.logger.critical('Cannot find user %s in the database.', options.args.auto_login)
+    self.sendLine('Sorry, autologin failed.', True)
   else:
-   self.sendLine('Creating initial user.')
-   self.create_username()
-  self.reset_timeout()
+   self.sendLine('Welcome to %s.' % get_config('server_name'))
+   if options.args.max_connections and len(connections) > options.args.max_connections:
+    self.sendLine('Sorry but the connection limit has been exceeded.', True)
+    return self.logger.warning('Booting because connection limit exceeded.')
+   elif db.players:
+    self.get_username()
+   else:
+    self.sendLine('Creating initial user.')
+    self.create_username()
+   self.reset_timeout()
  
  def connectionLost(self, reason):
   if connections[self.transport]:

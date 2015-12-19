@@ -43,14 +43,18 @@ class BaseObject(object):
    'take_msg',
    'odrop_msg',
    'otake_msg',
+   'help',
   ]
   self.dump_object_properties = [
    'location',
    'contents',
+   'owner',
   ]
   self.name = name # The name of this object.
   self._description = description
   self._contents = [] # The stuff that resides in this object.
+  self.help = None
+  self.owner = self
   self.drop_msg = drop_msg
   self.take_msg = take_msg
   self.odrop_msg = odrop_msg
@@ -185,3 +189,4 @@ class BaseObject(object):
 from .mobs import MobObject
 from .players import PlayerObject
 from .rooms import RoomObject
+from .zones import ZoneObject

@@ -24,6 +24,7 @@ class PlayerObject(MobObject):
  
  def __init__(self, *args, **kwargs):
   super(PlayerObject, self).__init__(*args, **kwargs)
+  self.owner = self
   self.last_command_time = 0.0 # The last time this object executed a command.
   self.dump_properties += [
    'banned',

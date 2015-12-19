@@ -13,6 +13,7 @@ parser.add_argument('-p', '--port', type = int, default = 4444, help = 'The serv
 parser.add_argument('-d', '--dumpfile', dest = 'dump_file', default = 'DB.json', help = 'Where to dump the database')
 parser.add_argument('-c', '--log-commands', action = 'store_true', help = 'Log commands')
 parser.add_argument('-m', '--max-connections', type = int, default = 0, help = 'Maximum number of connections or 0 for unlimited')
+parser.add_argument('-a', '--auto-login', type = str, default = None, help = 'Automatically log any new connection into the provided user')
 
 args = parser.parse_args([] if 'py.test' in sys.argv[0] else sys.argv[1:])
 

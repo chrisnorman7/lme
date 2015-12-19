@@ -2,6 +2,7 @@
 
 objects = [] # List of all loaded objects in the game.
 players = [] # List of created players.
+zones = [] # List of zone objects.
 
 server_config = dict( # Server configuration.
  connect_msg = '*** Connected ***',
@@ -19,7 +20,6 @@ server_config = dict( # Server configuration.
 objects_config = {} # Configuration which requires objects.
 
 import json, logging, objects as _objects, server, options
-logging.basicConfig(level = 'INFO')
 logger = logging.getLogger('DB')
 
 def dump_object_property(p):
@@ -73,10 +73,13 @@ def load(filename = None):
   for x, y in stuff.get('objects_config', {}).items():
    objects_config[x] = load_object_property(y)
   if 'start_room' not in objects_config:
-   logging.info('Creating start room.')
+   logger.info('Creating initial zone.')
+   z = _objects.ZoneObject('The First Zone')
+   logger.info('Creating start room.')
    objects_config['start_room'] = _objects.RoomObject('The First Room')
+   objects_config['start_room'].move(z)
   else:
-   logging.info('Start room: %s.', objects_config['start_room'])
+   logger.info('Start room: %s.', objects_config['start_room'])
   logger.info('Loaded %s object%s.', len(properties), '' if len(properties) == 1 else 's')
 
 def dump(filename = None):

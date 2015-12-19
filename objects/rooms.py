@@ -1,19 +1,18 @@
 """Room objects."""
 
-import logging
-from . import *
+import logging, objects
 
 logger = logging.getLogger('Room Objects')
 
-class ExtraObject(BaseObject):
+class ExtraObject(objects.BaseObject):
  pass
 
-class RoomObject(BaseObject):
+class RoomObject(objects.BaseObject):
  """A room object. This is the main scenery for the game."""
  @property
  def description(self):
   if self.is_light():
-   return self._description or NOTHINGSPECIAL
+   return self._description or objects.NOTHINGSPECIAL
   else:
    return self.dark_msg
  
@@ -33,7 +32,6 @@ class RoomObject(BaseObject):
    'exits',
    'entrances',
    'extras',
-   'zone'
   ]
   self.safe = False # If True, fighting is impossible in this room.
   self.light = True # If False, this room is always dark.
@@ -42,7 +40,6 @@ class RoomObject(BaseObject):
   self.exits = [] # The exits from this room.
   self.entrances = [] # The entrances to this room.
   self.extras = [] # The extra things to look at.
-  self.zone = None
  
  def is_light(self):
   """Return True if this room should be lit."""
@@ -83,7 +80,7 @@ class RoomObject(BaseObject):
  
  def title(self):
   """Return the zone name as well as the room name."""
-  if self.zone:
-   return '[%s; %s]' % (self.zone.title(), self.name)
+  if isinstance(self.location, objects.ZoneObject):
+   return '[%s; %s]' % (self.location.title(), self.name)
   else:
    return '[%s]' % self.name
