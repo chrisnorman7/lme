@@ -64,8 +64,8 @@ class ServerProtocol(LineReceiver):
     self.sendLine('Invalid username and password combination.', True)
   elif self.state == CREATE_USERNAME:
    self.tries += 1
-   if self.tries >= db.server_config['max_create_retries']:
-    return self.sendLine(db.server_config['max_create_retries_exceeded'], True)
+   if self.tries >= get_config('max_create_retries'):
+    return self.sendLine(get_config('max_create_retries_exceeded'), True)
    if line:
     for p in db.players:
      if p.uid == line:
@@ -80,8 +80,8 @@ class ServerProtocol(LineReceiver):
     self.sendLine('Usernames must not be blank.', True)
   elif self.state == CREATE_PASSWORD_1:
    self.tries += 1
-   if self.tries >= db.server_config['max_create_retries']:
-    return self.sendLine(db.server_config['max_create_retries_exceeded'], True)
+   if self.tries >= get_config('max_create_retries'):
+    return self.sendLine(get_config('max_create_retries_exceeded'), True)
    if not line:
     self.sendLine('Passwords must not be blank.')
     self.create_password()
@@ -99,8 +99,8 @@ class ServerProtocol(LineReceiver):
     self.create_password()
   elif self.state == CREATE_NAME:
    self.tries += 1
-   if self.tries >= db.server_config['max_create_retries']:
-    return self.sendLine(db.server_config['max_create_retries_exceeded'], True)
+   if self.tries >= get_config('max_create_retries'):
+    return self.sendLine(get_config('max_create_retries_exceeded'), True)
    if line:
     line = line.title()
     for p in db.players:
@@ -183,7 +183,7 @@ class ServerProtocol(LineReceiver):
   if object.transport:
    host, port = self.transport.getHost().host, self.transport.getHost().port
    logger.warning('Disconnecting %s:%s in favour of %s:%s.', object.transport.getHost().host, object.transport.getHost().port, host, port)
-   object.notify(db.server_config['redirect_msg'].format(host = host, port = port), True)
+   object.notify(get_config('redirect_msg').format(host = host, port = port), True)
    while object.transport:
     pass
   object.transport = self.transport
@@ -193,7 +193,7 @@ class ServerProtocol(LineReceiver):
    object.last_connected_host = gethostbyaddr(self.transport.hostname)[0]
   except gaierror:
    object.last_connected_host = self.transport.hostname
-  object.notify(db.server_config['connect_msg'])
+  object.notify(get_config('connect_msg'))
   object.on_connected()
  
  def get_username(self):
@@ -203,7 +203,7 @@ class ServerProtocol(LineReceiver):
  def connectionMade(self):
   self.tries = 0
   connections[self.transport] = None
-  self.sendLine('Welcome to %s.' % db.server_config['server_name'])
+  self.sendLine('Welcome to %s.' % get_config('server_name'))
   if db.players:
    self.get_username()
   else:
@@ -225,7 +225,7 @@ class ServerProtocol(LineReceiver):
 
 class Factory(ServerFactory):
  def buildProtocol(self, addr):
-  if addr.host in db.server_config.get('banned_hosts', []):
+  if addr.host in get_config('banned_hosts', []):
    return logger.warning('Blocked incoming connection from %s:%s.', addr.host, addr.port)
   else:
    logger.info('Incoming connection from %s:%s.', addr.host, addr.port)
@@ -247,7 +247,7 @@ def initialise():
  reactor.addSystemEventTrigger('after', 'shutdown', shutdown)
 
 def server_name():
- return '%s (version %s)' % (db.server_config['server_name'], version)
+ return '%s (version %s)' % (get_config('server_name'), version)
 
 def uptime():
  """Returns the number of seconds the server has been up for."""
@@ -256,3 +256,15 @@ def uptime():
 def shutdown():
  db.dump()
  logging.info('Server shutting down.')
+
+def get_config(key, default = KeyError):
+ if default == KeyError:
+  return db.server_config[key]
+ else:
+  return db.server_config.get(key, default)
+
+def set_config(key, value):
+ db.server_config[key] = value
+
+def clear_config(key):
+ del db.server_config[key]
