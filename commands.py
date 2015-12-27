@@ -19,11 +19,12 @@ name - a space-separated list of commands which can be used to invoke this comma
 access - The level of access necessary to view and execute this command.
 """
 
-import server, re, objects, objects.players as players, logging, options, db, util, traceback, socket, platform, multiprocessing, psutil
+import server, re, objects, objects.players as players, logging, options, db, util, traceback, socket, platform, multiprocessing, psutil, os
 from twisted.internet import reactor
 from inspect import getdoc
 from datetime import timedelta
 from time import ctime
+from memory import memory
 
 commands = {} # Command regexp and functions.
 
@@ -329,11 +330,16 @@ def do_info(obj):
   @info
  """
  mem = psutil.virtual_memory()
+ proc_size = memory()
  obj.notify('Server information:')
  obj.notify('Python Version: %s.' % platform.python_version())
+ obj.notify('PID: %s.' % os.getpid())
+ obj.notify('Process Size: %.2fMB (%.2f bytes).' % (proc_size / (1024.0 ** 2), proc_size))
  obj.notify('Opperating System: %s.' % platform.platform())
- obj.notify('Processor: %s.' % platform.processor() or 'No Information Available')
+ obj.notify('Processor: %s.' % (platform.processor() or 'Unknown'))
  obj.notify('Memory: Used %.2fMB of %.2fGB (%.2f%%).' % (mem.used / (1024.0 ** 2), mem.total / (1024.0 ** 3), mem.percent))
- return obj.notify('Max Concurrent Threads: %s.' % multiprocessing.cpu_count())
+ obj.notify('Max Concurrent Threads: %s.' % multiprocessing.cpu_count())
+ obj.notify('Objects in database: %s.' % len(db.objects))
+ return True
 do_info.name = '@info'
 add_command('^@info$', do_info)

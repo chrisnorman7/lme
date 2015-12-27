@@ -3,3 +3,4 @@ twisted
 bcrypt
 pytest
 psutil
+wmi
