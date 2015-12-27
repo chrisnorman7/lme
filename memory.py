@@ -1,3 +1,10 @@
+"""
+Get process size.
+
+Code derived from answers found at:
+http://stackoverflow.com/questions/938733/total-memory-used-by-python-process
+"""
+
 try:
  import wmi, pythoncom
 except ImportError:
